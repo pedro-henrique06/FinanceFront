@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "FinanceMobile",
-    "slug": "FinanceMobile",
+    "slug": "finance",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -16,13 +16,18 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.pedropuduia.finance",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.pedropuduia.finance"
     },
     "web": {
       "bundler": "metro",
@@ -36,6 +41,15 @@
       "typedRoutes": true
     },
     "entryPoint": "./index.js",
-    "newArchEnabled": true
+    "newArchEnabled": true,
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "589ff108-83e9-4063-bda8-cdd0b93fb0fb"
+      }
+    },
+    "owner": "pedropuduia"
   }
 }
