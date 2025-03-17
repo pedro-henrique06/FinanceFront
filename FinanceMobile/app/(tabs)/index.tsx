@@ -247,41 +247,34 @@ export default function HomeScreen() {
   // Formatando o mês e ano para exibição
   const monthYear = new Date(currentYear, currentMonth).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 
-  // Renderização do cabeçalho
-  const renderHeader = () => {
+  // Componente para o cabeçalho da tela
+  const Header = () => {
     return (
       <View style={styles.header}>
-        {/* Botão de menu-hambúrguer para abrir o drawer de navegação (esquerdo) */}
+        {/* Botão de menu hambúrguer para abrir o drawer de navegação (esquerdo) */}
         <TouchableOpacity 
           style={styles.menuButton} 
           onPress={() => {
-            // Tenta abrir o drawer de navegação (esquerdo)
+            // Tenta abrir o drawer de navegação
             try {
-              const parent = navigation.getParent();
-              if (parent) {
-                parent.dispatch(DrawerActions.openDrawer());
-              }
+              navigation.dispatch(DrawerActions.openDrawer());
             } catch (error) {
               console.error('Erro ao abrir drawer de navegação:', error);
+              Alert.alert('Erro', 'Não foi possível abrir o menu de navegação.');
             }
           }}
         >
           <FontAwesome name="bars" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>FinanceMobile</Text>
-        {/* Botão de 3 pontinhos para abrir o drawer do usuário (direito) */}
+        {/* Botão de notificações */}
         <TouchableOpacity 
           style={styles.menuButton} 
           onPress={() => {
-            // Tenta abrir o drawer do usuário (direito)
-            try {
-              navigation.dispatch(DrawerActions.openDrawer());
-            } catch (error) {
-              console.error('Erro ao abrir drawer do usuário:', error);
-            }
+            Alert.alert('Notificações', 'Você não tem novas notificações.');
           }}
         >
-          <FontAwesome name="ellipsis-v" size={24} color="#fff" />
+          <FontAwesome name="bell" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
     );
@@ -297,7 +290,7 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      {renderHeader()}
+      <Header />
       
       <ScrollView>
         <View style={styles.dashboardContainer}>

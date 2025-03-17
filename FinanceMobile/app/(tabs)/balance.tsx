@@ -24,7 +24,6 @@ import { FontAwesome } from '@expo/vector-icons';
 import { balanceService } from '../../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { LineChart } from 'react-native-chart-kit';
 import { useNavigation, DrawerActions } from '@react-navigation/native';
 import { DrawerNavigationProp } from '@react-navigation/drawer';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
@@ -35,134 +34,22 @@ interface Balance {
   totalIncome: number;
   totalExpenses: number;
   totalBalance: number;
+  description?: string;
+  category?: string;
+  paymentMethod?: string;
+  transactionType?: string;
 }
 
 interface BalanceInput {
+  userId: string;
   date: string;
-  totalIncome: string;
-  totalExpenses: string;
+  type: string;
+  amount: string;
+  description: string;
+  category: string;
+  transactionType: string;
+  paymentMethod: string;
 }
-
-// Componente para o gráfico de balanço
-const BalanceChart = ({ balances }: { balances: Balance[] }) => {
-  // Ordenar balanços por data
-  const sortedBalances = [...balances].sort((a, b) => {
-    return new Date(a.date).getTime() - new Date(b.date).getTime();
-  });
-  
-  // Se não houver dados suficientes, criar dados de exemplo
-  let chartBalances = sortedBalances;
-  if (sortedBalances.length < 2) {
-    // Dados de exemplo para demonstração
-    chartBalances = [
-      { id: '1', date: '2023-07-19', totalIncome: 500, totalExpenses: 300, totalBalance: 200 },
-      { id: '2', date: '2023-07-20', totalIncome: 0, totalExpenses: 100, totalBalance: -100 },
-      { id: '3', date: '2023-07-21', totalIncome: 300, totalExpenses: 200, totalBalance: 100 },
-      { id: '4', date: '2023-07-22', totalIncome: 200, totalExpenses: 400, totalBalance: -200 },
-      { id: '5', date: '2023-07-23', totalIncome: 700, totalExpenses: 300, totalBalance: 400 },
-      { id: '6', date: '2023-07-24', totalIncome: 100, totalExpenses: 100, totalBalance: 0 },
-      { id: '7', date: '2023-07-25', totalIncome: 800, totalExpenses: 300, totalBalance: 500 }
-    ];
-  }
-  
-  // Limitar a quantidade de pontos para melhorar a legibilidade
-  // Mostrar no máximo 6 pontos para evitar sobreposição
-  const maxPoints = 6;
-  let displayBalances = chartBalances;
-  if (chartBalances.length > maxPoints) {
-    const step = Math.ceil(chartBalances.length / maxPoints);
-    displayBalances = chartBalances.filter((_, index) => index % step === 0);
-    
-    // Garantir que o último ponto seja incluído
-    if (displayBalances[displayBalances.length - 1].id !== chartBalances[chartBalances.length - 1].id) {
-      displayBalances.push(chartBalances[chartBalances.length - 1]);
-    }
-  }
-  
-  // Extrair os valores de saldo para o gráfico
-  const labels = displayBalances.map(balance => {
-    const date = new Date(balance.date);
-    return `${date.getDate()}/${date.getMonth() + 1}`;
-  });
-  
-  const data = displayBalances.map(balance => balance.totalBalance);
-  
-  // Configuração do gráfico
-  const chartConfig = {
-    backgroundGradientFrom: '#007bff',
-    backgroundGradientTo: '#007bff',
-    decimalPlaces: 0,
-    color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-    labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-    style: {
-      borderRadius: 0
-    },
-    propsForDots: {
-      r: '4',
-      strokeWidth: '1',
-      stroke: '#fff'
-    },
-    propsForBackgroundLines: {
-      strokeWidth: 0
-    },
-    propsForLabels: {
-      fontSize: 10,
-      fontWeight: 'bold',
-      fill: '#fff'
-    },
-    paddingRight: 50,
-    paddingTop: 90,
-    paddingBottom: 40
-  };
-  
-  const chartData = {
-    labels: labels,
-    datasets: [
-      {
-        data: data,
-        color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-        strokeWidth: 3
-      }
-    ],
-    legend: ['Saldo']
-  };
-  
-  const screenWidth = Dimensions.get('window').width;
-  
-  return (
-    <View style={styles.chartWrapper}>
-      <View style={{ backgroundColor: '#007bff', paddingTop: 0, paddingBottom: 0 }}>
-        <LineChart
-          data={chartData}
-          width={screenWidth}
-          height={100}
-          chartConfig={chartConfig}
-          bezier
-          style={{
-            marginVertical: 0,
-            borderRadius: 0,
-            backgroundColor: '#007bff'
-          }}
-          withInnerLines={false}
-          withOuterLines={false}
-          withVerticalLabels={true}
-          withHorizontalLabels={true}
-          withDots={true}
-          withShadow={false}
-          yAxisInterval={1}
-          fromZero={false}
-          segments={3}
-          yAxisSuffix=""
-          yAxisLabel=""
-          horizontalLabelRotation={0}
-          verticalLabelRotation={0}
-          transparent={true}
-          getDotColor={(dataPoint, dataPointIndex) => '#fff'}
-        />
-      </View>
-    </View>
-  );
-};
 
 // Componente de esqueleto para carregamento
 const SkeletonLoader = () => {
@@ -187,12 +74,68 @@ const SkeletonLoader = () => {
 
   return (
     <View style={styles.skeletonContainer}>
-      {[1, 2, 3].map((item) => (
+      {/* Esqueleto para o dia atual */}
+      <View style={styles.daySection}>
         <RNAnimated.View 
-          key={item} 
+          style={[
+            styles.skeletonDayTitle,
+            { opacity: fadeAnim }
+          ]}
+        />
+        
+        {/* Esqueletos para transações */}
+        {[1, 2, 3].map((item) => (
+          <RNAnimated.View 
+            key={item} 
+            style={[
+              styles.transactionItem,
+              { opacity: fadeAnim }
+            ]}
+          >
+            <View style={styles.skeletonIconContainer} />
+            <View style={styles.skeletonDetails}>
+              <View style={styles.skeletonTitle} />
+              <View style={styles.skeletonSubtitle} />
+            </View>
+            <View style={styles.skeletonAmount} />
+            <View style={styles.skeletonActions} />
+          </RNAnimated.View>
+        ))}
+      </View>
+      
+      {/* Esqueleto para "Hoje" */}
+      <View style={styles.daySection}>
+        <RNAnimated.View 
+          style={[
+            styles.skeletonDayTitle,
+            { opacity: fadeAnim }
+          ]}
+        />
+        
+        {/* Esqueleto para transação */}
+        <RNAnimated.View 
+          style={[
+            styles.transactionItem,
+            { opacity: fadeAnim }
+          ]}
+        >
+          <View style={styles.skeletonIconContainer} />
+          <View style={styles.skeletonDetails}>
+            <View style={styles.skeletonTitle} />
+            <View style={styles.skeletonSubtitle} />
+          </View>
+          <View style={styles.skeletonAmount} />
+          <View style={styles.skeletonActions} />
+        </RNAnimated.View>
+      </View>
+      
+      {/* Esqueletos para balanços */}
+      {[1, 2].map((item) => (
+        <RNAnimated.View 
+          key={`balance-${item}`} 
           style={[
             styles.balanceCard,
-            { opacity: fadeAnim }
+            { opacity: fadeAnim, marginHorizontal: 15, marginBottom: 10 }
           ]}
         >
           <View style={styles.skeletonHeader} />
@@ -219,42 +162,65 @@ const SkeletonLoader = () => {
   );
 };
 
+// Componente para exibir mensagens de erro
+const ErrorMessage = ({ message, onRetry }: { message: string, onRetry: () => void }) => {
+  return (
+    <View style={styles.errorContainer}>
+      <FontAwesome name="exclamation-circle" size={50} color="#e74c3c" />
+      <Text style={styles.errorText}>{message}</Text>
+      <TouchableOpacity style={styles.retryButton} onPress={onRetry}>
+        <Text style={styles.retryButtonText}>Tentar novamente</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+
 type DrawerNavigationProps = DrawerNavigationProp<any>;
 
 export default function BalanceScreen() {
+  const navigation = useNavigation<DrawerNavigationProps>();
+  const screenWidth = Dimensions.get('window').width;
+  const fadeAnim = useSharedValue(0);
+  const slideAnim = useSharedValue(20);
+
+  // Função para formatar o mês e ano - movida para o início da função
+  const formatMonthYear = (date: Date): string => {
+    const months = [
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+    return `${month} de ${year}`;
+  };
+
   const [balances, setBalances] = useState<Balance[]>([]);
+  const [filteredBalances, setFilteredBalances] = useState<Balance[]>([]);
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
-  const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [newBalance, setNewBalance] = useState<BalanceInput>({
+    userId: '00000000-0000-0000-0000-000000000000', // Valor padrão, deve ser substituído pelo ID do usuário logado
     date: new Date().toISOString().split('T')[0],
-    totalIncome: '',
-    totalExpenses: ''
+    type: 'Despesa',
+    amount: '',
+    description: '',
+    category: 'Outros',
+    transactionType: 'Regular',
+    paymentMethod: ''
   });
-  
-  const incomeInputRef = useRef<TextInput>(null);
   const expensesInputRef = useRef<TextInput>(null);
-  const navigation = useNavigation<DrawerNavigationProps>();
-  const [chartHeight, setChartHeight] = useState(120);
-  const animatedHeight = useSharedValue(120);
-  const screenWidth = Dimensions.get('window').width;
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
+  const [monthYear, setMonthYear] = useState<string>(formatMonthYear(new Date()));
+  const [searchModalVisible, setSearchModalVisible] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filteredTransactions, setFilteredTransactions] = useState<any[]>([]);
 
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      height: animatedHeight.value,
-    };
-  });
-
-  useEffect(() => {
-    animatedHeight.value = withTiming(chartHeight, {
-      duration: 500,
-      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-    });
-  }, [chartHeight]);
+  const incomeInputRef = useRef<TextInput>(null);
 
   // Função para formatar valor como moeda
   const formatCurrency = (value: string) => {
@@ -277,10 +243,13 @@ export default function BalanceScreen() {
   };
 
   // Função para lidar com a mudança de valores nos inputs
-  const handleValueChange = (text: string, field: 'totalIncome' | 'totalExpenses') => {
-    // Substitui vírgulas por pontos para cálculos
-    const formattedText = text.replace(',', '.');
-    setNewBalance({...newBalance, [field]: formattedText});
+  const handleValueChange = (text: string, field: keyof BalanceInput) => {
+    if (field === 'amount') {
+      const formattedValue = formatCurrency(text);
+      setNewBalance({ ...newBalance, [field]: formattedValue });
+    } else {
+      setNewBalance({ ...newBalance, [field]: text });
+    }
   };
 
   // Função para converter o valor formatado para número
@@ -291,62 +260,85 @@ export default function BalanceScreen() {
 
   // Função para mudar o mês
   const changeMonth = (increment: number) => {
-    let newMonth = currentMonth + increment;
-    let newYear = currentYear;
+    // Criar uma nova data baseada na data atual
+    const newDate = new Date(currentMonth);
     
-    if (newMonth > 11) {
-      newMonth = 0;
-      newYear += 1;
-    } else if (newMonth < 0) {
-      newMonth = 11;
-      newYear -= 1;
-    }
+    // Adicionar ou subtrair meses
+    newDate.setMonth(newDate.getMonth() + increment);
     
-    // Ativa o loading antes de mudar o mês
+    // Atualizar o estado com a nova data
+    setCurrentMonth(newDate);
+    
+    // Atualizar o texto do mês e ano
+    const newMonthYear = formatMonthYear(newDate);
+    setMonthYear(newMonthYear);
+    
+    // Buscar os balanços para o novo mês
     setLoading(true);
-    
-    setCurrentMonth(newMonth);
-    setCurrentYear(newYear);
+    fetchBalances();
   };
 
   // Função para buscar os balanços do mês atual
   const fetchBalances = async () => {
     try {
-      // Não definimos loading como true aqui, pois já foi definido no changeMonth
+      setLoading(true);
+      setError(null);
       
-      // Obtém o token de autenticação
-      const token = await AsyncStorage.getItem('userToken');
-      if (!token) {
-        console.error('Token não encontrado');
+      // Obter o mês e ano atual
+      const month = currentMonth.getMonth() + 1; // getMonth() retorna 0-11
+      const year = currentMonth.getFullYear();
+      
+      console.log(`Buscando transações para o mês ${month} e ano ${year}`);
+      
+      // Fazer a requisição para a API
+      const response = await fetch(`https://financeapi-app.azurewebsites.net/api/Transaction/bymonth?month=${month}&year=${year}`);
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          // Se não houver dados para este mês, retornar uma lista vazia em vez de lançar um erro
+          console.log(`Nenhuma transação encontrada para o mês ${month} e ano ${year}`);
+          setBalances([]);
+          setFilteredBalances([]);
+          return;
+        }
+        throw new Error(`Erro ao buscar transações: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Verificar se os dados são válidos
+      if (!data || !Array.isArray(data)) {
+        console.log('Dados inválidos recebidos da API:', data);
         setBalances([]);
-        setLoading(false);
+        setFilteredBalances([]);
         return;
       }
       
-      // Obtém os balanços do mês atual
-      const response = await balanceService.getAll();
+      // Mapear os dados recebidos para o formato esperado pela interface
+      const mappedData = data.map((item: any) => ({
+        id: item.id || `temp-${Date.now()}-${Math.random()}`,
+        date: item.date || new Date().toISOString(),
+        description: item.description || '',
+        category: item.category || 'Outros',
+        paymentMethod: item.paymentMethod || '',
+        transactionType: item.transactionType || 'Regular',
+        totalIncome: item.type === 'Entrada' ? item.amount : 0,
+        totalExpenses: item.type === 'Saída' || item.type === 'Despesa' ? item.amount : 0,
+        totalBalance: item.type === 'Entrada' ? item.amount : -item.amount,
+      }));
       
-      // Filtra os balanços do mês atual
-      const filteredBalances = response.filter((balance: Balance) => {
-        const balanceDate = new Date(balance.date);
-        return (
-          balanceDate.getMonth() === currentMonth && 
-          balanceDate.getFullYear() === currentYear
-        );
-      });
-      
-      // Ordena os balanços por data (mais recente primeiro)
-      const sortedBalances = filteredBalances.sort((a: Balance, b: Balance) => {
-        return new Date(b.date).getTime() - new Date(a.date).getTime();
-      });
-      
-      setBalances(sortedBalances);
+      console.log(`Encontradas ${mappedData.length} transações`);
+      setBalances(mappedData);
+      // Atualizar também as transações filtradas se não houver filtro ativo
+      if (!activeFilter) {
+        setFilteredBalances(mappedData);
+      }
     } catch (error) {
-      console.error('Erro ao buscar balanços:', error);
-      Alert.alert('Erro', 'Não foi possível carregar os balanços. Tente novamente.');
+      console.error('Erro ao buscar transações:', error);
+      setError(`Não foi possível carregar as transações: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
       setBalances([]);
+      setFilteredBalances([]);
     } finally {
-      // Desativa o loading após a conclusão
       setLoading(false);
       setRefreshing(false);
     }
@@ -361,7 +353,7 @@ export default function BalanceScreen() {
   // Efeito para carregar os balanços ao iniciar e quando o mês/ano mudar
   useEffect(() => {
     fetchBalances();
-  }, [currentMonth, currentYear]);
+  }, [currentMonth]);
 
   // Função para lidar com a mudança de data no DateTimePicker
   const handleDateChange = (event: any, selectedDate?: Date) => {
@@ -384,86 +376,189 @@ export default function BalanceScreen() {
     return `${day}/${month}/${year}`;
   };
 
+  // Efeito para animar os elementos quando os dados são carregados
+  useEffect(() => {
+    if (!loading) {
+      fadeAnim.value = withTiming(1, { duration: 500, easing: Easing.out(Easing.ease) });
+      slideAnim.value = withTiming(0, { duration: 500, easing: Easing.out(Easing.ease) });
+    } else {
+      fadeAnim.value = 0;
+      slideAnim.value = 20;
+    }
+  }, [loading, fadeAnim, slideAnim]);
+  
+  // Estilo animado para os elementos
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: fadeAnim.value,
+      transform: [{ translateY: slideAnim.value }]
+    };
+  });
+
+  // Função para mostrar um feedback visual ao adicionar uma transação
+  const showSuccessFeedback = () => {
+    // Mostrar um feedback visual de sucesso
+    Alert.alert(
+      'Sucesso',
+      'Transação adicionada com sucesso!',
+      [{ text: 'OK', onPress: () => setModalVisible(false) }]
+    );
+    
+    // Atualizar os dados
+    fetchBalances();
+  };
+  
+  // Função para mostrar um feedback visual ao excluir uma transação
+  const showDeleteFeedback = () => {
+    // Mostrar um feedback visual de sucesso
+    Alert.alert(
+      'Sucesso',
+      'Transação excluída com sucesso!',
+      [{ text: 'OK' }]
+    );
+    
+    // Atualizar os dados
+    fetchBalances();
+  };
+
   // Função para adicionar um novo balanço
   const handleAddBalance = async () => {
     try {
-      // Validação dos campos
-      if (!newBalance.totalIncome || !newBalance.totalExpenses) {
-        Alert.alert('Erro', 'Por favor, preencha todos os campos.');
+      setLoading(true);
+      
+      // Extrair o valor numérico do campo formatado
+      const amount = getNumericValue(newBalance.amount);
+      
+      if (amount <= 0) {
+        Alert.alert('Erro', 'O valor deve ser maior que zero.');
+        setLoading(false);
         return;
       }
-
-      // Converte os valores para números
-      const income = parseFloat(newBalance.totalIncome);
-      const expenses = parseFloat(newBalance.totalExpenses);
-
-      // Verifica se os valores são números válidos
-      if (isNaN(income) || isNaN(expenses)) {
-        Alert.alert('Erro', 'Por favor, insira valores numéricos válidos.');
-        return;
-      }
-
-      // Obtém o token de autenticação
-      const token = await AsyncStorage.getItem('userToken');
-      if (!token) {
-        Alert.alert('Erro', 'Você precisa estar autenticado para adicionar um balanço.');
-        return;
-      }
-
-      // Prepara os dados para enviar à API
-      const balanceData = {
-        date: newBalance.date,
-        totalIncome: income,
-        totalExpenses: expenses
+      
+      // Preparar os dados para envio
+      const transactionData = {
+        userId: newBalance.userId,
+        date: new Date(newBalance.date).toISOString(),
+        type: newBalance.type,
+        amount: amount,
+        description: newBalance.description,
+        category: newBalance.category,
+        transactionType: newBalance.transactionType,
+        paymentMethod: newBalance.paymentMethod
       };
-
-      // Envia os dados para a API
-      const response = await balanceService.create(balanceData);
-
-      // Fecha o modal e atualiza a lista de balanços
-      setModalVisible(false);
-      fetchBalances();
-
-      // Limpa o formulário
-      setNewBalance({
-        date: new Date().toISOString().split('T')[0],
-        totalIncome: '',
-        totalExpenses: ''
+      
+      console.log('Enviando dados:', transactionData);
+      
+      // Enviar para a API
+      const response = await fetch('https://financeapi-app.azurewebsites.net/api/Transaction', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(transactionData),
       });
-
-      // Exibe mensagem de sucesso
-      Alert.alert('Sucesso', 'Balanço adicionado com sucesso!');
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Erro ao adicionar transação');
+      }
+      
+      // Fechar o modal e mostrar feedback
+      showSuccessFeedback();
     } catch (error) {
-      console.error('Erro ao adicionar balanço:', error);
-      Alert.alert('Erro', 'Não foi possível adicionar o balanço. Tente novamente.');
+      console.error('Erro ao adicionar transação:', error);
+      Alert.alert('Erro', `Não foi possível adicionar a transação: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Formatando o mês e ano para exibição
-  const monthYear = new Date(currentYear, currentMonth).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-  
   // Calcular o total de receitas, despesas e saldo do mês
   const totalMonthIncome = balances.reduce((sum, balance) => sum + balance.totalIncome, 0);
   const totalMonthExpenses = balances.reduce((sum, balance) => sum + balance.totalExpenses, 0);
   const totalMonthBalance = totalMonthIncome - totalMonthExpenses;
 
+  // Função para determinar a cor e ícone com base na categoria
+  const getCategoryInfo = (category: string) => {
+    // Mapeamento de categorias para cores e ícones
+    const categoryMap: Record<string, { color: string; icon: string }> = {
+      'Casa': { color: '#3498db', icon: 'home' },
+      'Alimentação': { color: '#e74c3c', icon: 'cutlery' },
+      'Transporte': { color: '#f39c12', icon: 'car' },
+      'Saúde': { color: '#2ecc71', icon: 'medkit' },
+      'Educação': { color: '#9b59b6', icon: 'book' },
+      'Lazer': { color: '#1abc9c', icon: 'gamepad' },
+      'Vestuário': { color: '#e67e22', icon: 'shopping-bag' },
+      'Viagem': { color: '#3498db', icon: 'plane' },
+      'Presente': { color: '#e74c3c', icon: 'gift' },
+      'Salário': { color: '#2ecc71', icon: 'money' },
+      'Investimento': { color: '#f39c12', icon: 'line-chart' },
+      'Mercado': { color: '#e74c3c', icon: 'shopping-cart' },
+      'Restaurante': { color: '#e67e22', icon: 'cutlery' },
+      'Farmácia': { color: '#2ecc71', icon: 'plus-square' },
+      'Combustível': { color: '#f39c12', icon: 'tint' },
+      'Internet': { color: '#3498db', icon: 'wifi' },
+      'Telefone': { color: '#9b59b6', icon: 'phone' },
+      'Água': { color: '#3498db', icon: 'tint' },
+      'Luz': { color: '#f1c40f', icon: 'bolt' },
+      'Aluguel': { color: '#e74c3c', icon: 'building' },
+      'Outros': { color: '#95a5a6', icon: 'question-circle' }
+    };
+    
+    // Retorna as informações da categoria ou um valor padrão se a categoria não existir
+    return categoryMap[category] || { color: '#95a5a6', icon: 'question-circle' };
+  };
+
+  // Obter todas as categorias disponíveis
+  const getAllCategories = () => {
+    return [
+      'Casa', 'Alimentação', 'Transporte', 'Saúde', 'Educação', 
+      'Lazer', 'Vestuário', 'Viagem', 'Presente', 'Salário', 
+      'Investimento', 'Mercado', 'Restaurante', 'Farmácia', 
+      'Combustível', 'Internet', 'Telefone', 'Água', 'Luz', 
+      'Aluguel', 'Outros'
+    ];
+  };
+
   // Função para lidar com o clique em um balanço
   const handleBalancePress = (balance: Balance) => {
-    // Aqui você pode implementar a navegação para a tela de detalhes do balanço
-    Alert.alert('Detalhes do Balanço', `Data: ${new Date(balance.date).toLocaleDateString('pt-BR')}`);
+    // Navega para a tela de registro com os dados do balanço
+    setSelectedDate(new Date(balance.date));
+    setNewBalance({
+      date: balance.date,
+      totalIncome: balance.totalIncome.toString(),
+      totalExpenses: balance.totalExpenses.toString()
+    });
+    setModalVisible(true);
   };
 
   // Função para editar um balanço
   const handleEditBalance = (balance: Balance) => {
-    // Implementação futura para edição de balanço
-    Alert.alert('Editar Balanço', 'Funcionalidade em desenvolvimento');
+    // Preparar os dados para edição
+    setNewBalance({
+      userId: '00000000-0000-0000-0000-000000000000', // Valor padrão, deve ser substituído pelo ID do usuário logado
+      date: new Date(balance.date).toISOString().split('T')[0],
+      type: balance.totalIncome > 0 ? 'Entrada' : 'Despesa',
+      amount: formatCurrency(Math.abs(balance.totalBalance).toString()),
+      description: balance.description || '',
+      category: balance.category || 'Outros',
+      transactionType: balance.transactionType || 'Regular',
+      paymentMethod: balance.paymentMethod || ''
+    });
+    
+    // Definir a data selecionada para o DatePicker
+    setSelectedDate(new Date(balance.date));
+    
+    // Abrir o modal
+    setModalVisible(true);
   };
 
   // Função para excluir um balanço
   const handleDeleteBalance = (balance: Balance) => {
+    // Confirmar exclusão
     Alert.alert(
       'Confirmar Exclusão',
-      'Tem certeza que deseja excluir este balanço?',
+      'Tem certeza que deseja excluir esta transação?',
       [
         {
           text: 'Cancelar',
@@ -474,11 +569,27 @@ export default function BalanceScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Implementação futura para exclusão de balanço
-              Alert.alert('Excluir Balanço', 'Funcionalidade em desenvolvimento');
+              setLoading(true);
+              
+              // Fazer a requisição para excluir a transação
+              const response = await fetch(`https://financeapi-app.azurewebsites.net/api/Transaction/${balance.id}`, {
+                method: 'DELETE',
+                headers: {
+                  'Content-Type': 'application/json',
+                }
+              });
+              
+              if (!response.ok) {
+                throw new Error(`Erro ao excluir transação: ${response.status}`);
+              }
+              
+              // Mostrar feedback de sucesso
+              showDeleteFeedback();
             } catch (error) {
-              console.error('Erro ao excluir balanço:', error);
-              Alert.alert('Erro', 'Não foi possível excluir o balanço. Tente novamente.');
+              console.error('Erro ao excluir transação:', error);
+              Alert.alert('Erro', `Não foi possível excluir a transação: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+            } finally {
+              setLoading(false);
             }
           }
         }
@@ -486,281 +597,1058 @@ export default function BalanceScreen() {
     );
   };
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#007bff" />
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.menuButton} onPress={() => navigation.getParent()?.getParent()?.dispatch(DrawerActions.openDrawer())}>
-          <FontAwesome name="navicon" size={24} color="#fff" />
-        </TouchableOpacity>
-        <View style={styles.monthSelector}>
-          <TouchableOpacity onPress={() => changeMonth(-1)} style={styles.arrowButton}>
-            <FontAwesome name="chevron-left" size={24} color="#fff" />
-          </TouchableOpacity>
-          <Text style={styles.monthText}>
-            {new Date(currentYear, currentMonth).toLocaleDateString('pt-BR', { month: 'long' })}
-          </Text>
-          <TouchableOpacity onPress={() => changeMonth(1)} style={styles.arrowButton}>
-            <FontAwesome name="chevron-right" size={24} color="#fff" />
-          </TouchableOpacity>
-        </View>
-        <TouchableOpacity style={styles.menuButton} onPress={() => navigation.getParent()?.dispatch(DrawerActions.openDrawer())}>
-          <FontAwesome name="ellipsis-v" size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
+  // Função para filtrar transações com base no termo de busca
+  const filterTransactions = (term: string) => {
+    // Aqui estamos usando os exemplos fixos de transações para demonstração
+    // Em uma implementação real, você usaria os dados reais do seu backend
+    const exampleTransactions = [
+      { id: '1', title: 'Amigo', subtitle: 'Alimentação | Caixa', amount: 50, icon: 'user', color: '#e74c3c', date: '2023-06-15' },
+      { id: '2', title: 'Pizza', subtitle: 'Pizza | Caixa', amount: 30, icon: 'cutlery', color: '#e74c3c', date: '2023-06-14' },
+      { id: '3', title: 'TV (4/10)', subtitle: 'Casa | Caixa', amount: 200, icon: 'home', color: '#3498db', date: '2023-06-10' },
+      { id: '4', title: 'IPTU', subtitle: 'Casa | Carteira', amount: 76, icon: 'home', color: '#3498db', date: '2023-06-05' },
+      { id: '5', title: 'Mercado', subtitle: 'Alimentação | Cartão', amount: 120, icon: 'shopping-cart', color: '#2ecc71', date: '2023-06-03' },
+      { id: '6', title: 'Farmácia', subtitle: 'Saúde | Cartão', amount: 45, icon: 'medkit', color: '#9b59b6', date: '2023-06-01' },
+      { id: '7', title: 'Combustível', subtitle: 'Transporte | Cartão', amount: 80, icon: 'car', color: '#f39c12', date: '2023-05-28' },
+    ];
+    
+    if (!term.trim()) {
+      return [];
+    }
+    
+    return exampleTransactions.filter(transaction => 
+      transaction.title.toLowerCase().includes(term.toLowerCase()) ||
+      transaction.subtitle.toLowerCase().includes(term.toLowerCase())
+    );
+  };
 
-      <View style={styles.balanceSection}>
-        <View style={styles.balanceContainer}>
-          <View style={styles.balanceItem}>
-            <View style={styles.balanceIconContainer}>
-              <FontAwesome name="circle-o" size={20} color="#fff" />
-            </View>
-            <Text style={styles.balanceLabel}>Inicial</Text>
-            <Text style={styles.balanceValue}>R$ 0,00</Text>
-          </View>
+  // Função para formatar o dia da semana e data
+  const formatDayHeader = (date: Date): string => {
+    const weekday = date.toLocaleDateString('pt-BR', { weekday: 'long' });
+    const formattedWeekday = weekday.charAt(0).toUpperCase() + weekday.slice(1);
+    const day = date.getDate().toString().padStart(2, '0');
+    
+    return `${formattedWeekday}, ${day}`;
+  };
 
-          <View style={styles.balanceItem}>
-            <View style={styles.balanceIconContainer}>
-              <FontAwesome name="circle" size={20} color="#fff" />
-            </View>
-            <Text style={styles.balanceLabel}>Saldo</Text>
-            <Text style={styles.balanceValue}>R$ {totalMonthBalance.toFixed(2).replace('.', ',')}</Text>
-          </View>
-
-          <View style={styles.balanceItem}>
-            <View style={styles.balanceIconContainer}>
-              <FontAwesome name="clock-o" size={20} color="#fff" />
-            </View>
-            <Text style={styles.balanceLabel}>Previsto</Text>
-            <Text style={styles.balanceValue}>R$ {totalMonthBalance.toFixed(2).replace('.', ',')}</Text>
-          </View>
-        </View>
-
-        {/* Gráfico fixo sem animação */}
-        <View style={styles.chartContainer}>
-          {loading ? (
-            <SkeletonLoader />
-          ) : (
-            <BalanceChart balances={balances} />
-          )}
-        </View>
-      </View>
-
-      <ScrollView 
-        style={styles.balanceList}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+  // Função para agrupar transações por data
+  const groupTransactionsByDate = (transactions: Balance[] = balances) => {
+    if (!transactions || transactions.length === 0) {
+      return [];
+    }
+    
+    const grouped: Record<string, Balance[]> = {};
+    
+    transactions.forEach(transaction => {
+      if (!transaction.date) {
+        console.warn('Transação sem data encontrada:', transaction);
+        return; // Pular transações sem data
+      }
+      
+      try {
+        const date = new Date(transaction.date);
+        if (isNaN(date.getTime())) {
+          console.warn('Data inválida encontrada:', transaction.date);
+          return; // Pular datas inválidas
         }
-      >
-        {balances.map((balance) => (
+        
+        const dateKey = date.toISOString().split('T')[0]; // Formato YYYY-MM-DD
+        
+        if (!grouped[dateKey]) {
+          grouped[dateKey] = [];
+        }
+        
+        grouped[dateKey].push(transaction);
+      } catch (error) {
+        console.error('Erro ao processar data da transação:', error, transaction);
+      }
+    });
+    
+    // Ordenar as datas (mais recentes primeiro)
+    return Object.keys(grouped)
+      .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())
+      .map(date => ({
+        date,
+        transactions: grouped[date].sort((a, b) => {
+          // Ordenar transações do mesmo dia por hora (se disponível)
+          const timeA = new Date(a.date).getTime();
+          const timeB = new Date(b.date).getTime();
+          return timeB - timeA; // Mais recentes primeiro
+        })
+      }));
+  };
+
+  // Função para formatar a data de exibição
+  const formatDisplayDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      
+      // Verificar se a data é válida
+      if (isNaN(date.getTime())) {
+        console.warn('Data inválida para formatação:', dateString);
+        return 'Data inválida';
+      }
+      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Resetar horas para comparação apenas de data
+      
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      const dateOnly = new Date(date);
+      dateOnly.setHours(0, 0, 0, 0); // Resetar horas para comparação apenas de data
+      
+      // Verificar se é hoje
+      if (dateOnly.getTime() === today.getTime()) {
+        return 'Hoje';
+      }
+      
+      // Verificar se é ontem
+      if (dateOnly.getTime() === yesterday.getTime()) {
+        return 'Ontem';
+      }
+      
+      // Verificar se é esta semana
+      const dayDiff = Math.floor((today.getTime() - dateOnly.getTime()) / (1000 * 60 * 60 * 24));
+      if (dayDiff < 7) {
+        // Retornar o nome do dia da semana
+        const weekdays = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+        return weekdays[date.getDay()];
+      }
+      
+      // Caso contrário, retornar a data formatada
+      return date.toLocaleDateString('pt-BR', { 
+        day: '2-digit', 
+        month: '2-digit',
+        year: '2-digit'
+      });
+    } catch (error) {
+      console.error('Erro ao formatar data:', error, dateString);
+      return 'Data inválida';
+    }
+  };
+
+  // Modificando o componente Header para ficar mais parecido com o modelo
+  const Header = () => {
+    return (
+      <View style={styles.headerContainer}>
+        <View style={styles.header}>
+          {/* Botão de menu hambúrguer para abrir o drawer de navegação */}
           <TouchableOpacity 
-            key={balance.id} 
-            style={styles.balanceCard}
-            onPress={() => handleBalancePress(balance)}
+            style={styles.menuButton} 
+            onPress={() => {
+              // Tenta abrir o drawer de navegação
+              try {
+                navigation.dispatch(DrawerActions.openDrawer());
+              } catch (error) {
+                console.error('Erro ao abrir drawer de navegação:', error);
+                Alert.alert('Erro', 'Não foi possível abrir o menu de navegação.');
+              }
+            }}
           >
-            <View style={styles.balanceCardHeader}>
-              <Text style={styles.balanceCardDate}>
-                {new Date(balance.date).toLocaleDateString('pt-BR')}
-              </Text>
-              <View style={styles.balanceCardActions}>
-                <TouchableOpacity onPress={() => handleEditBalance(balance)}>
-                  <FontAwesome name="pencil" size={18} color="#666" />
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={styles.deleteButton} 
-                  onPress={() => handleDeleteBalance(balance)}
-                >
-                  <FontAwesome name="trash" size={18} color="#666" />
-                </TouchableOpacity>
-              </View>
-            </View>
-            <View style={styles.balanceCardContent}>
-              <View style={styles.balanceCardItem}>
-                <Text style={styles.balanceCardLabel}>Receitas</Text>
-                <Text style={[styles.balanceCardValue, styles.incomeValue]}>
-                  R$ {balance.totalIncome.toFixed(2).replace('.', ',')}
-                </Text>
-              </View>
-              <View style={styles.balanceCardItem}>
-                <Text style={styles.balanceCardLabel}>Despesas</Text>
-                <Text style={[styles.balanceCardValue, styles.expenseValue]}>
-                  R$ {balance.totalExpenses.toFixed(2).replace('.', ',')}
-                </Text>
-              </View>
-              <View style={styles.balanceCardItem}>
-                <Text style={styles.balanceCardLabel}>Saldo</Text>
-                <Text style={[
-                  styles.balanceCardValue, 
-                  balance.totalBalance >= 0 ? styles.incomeValue : styles.expenseValue
-                ]}>
-                  R$ {balance.totalBalance.toFixed(2).replace('.', ',')}
-                </Text>
-              </View>
-            </View>
+            <FontAwesome name="bars" size={24} color="#fff" />
           </TouchableOpacity>
-        ))}
-      </ScrollView>
-      
-      {/* Modal para adicionar balanço */}
-      <Modal
-        visible={modalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <SafeAreaView style={{ flex: 1 }}>
-          <KeyboardAvoidingView 
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={{ flex: 1 }}
+          <Text style={[styles.headerTitle, { marginLeft: 20 }]}>Transações</Text>
+          <View style={styles.headerButtons}>
+            {/* Botões na ordem: lupa, adicionar, sino */}
+            <TouchableOpacity 
+              style={styles.menuButton} 
+              onPress={() => {
+                setSearchTerm('');
+                setFilteredTransactions([]);
+                setSearchModalVisible(true);
+              }}
+            >
+              <FontAwesome name="search" size={24} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.menuButton} 
+              onPress={() => {
+                setSelectedDate(new Date());
+                setNewBalance({
+                  userId: '00000000-0000-0000-0000-000000000000', // Valor padrão, deve ser substituído pelo ID do usuário logado
+                  date: new Date().toISOString().split('T')[0],
+                  type: 'Despesa',
+                  amount: '',
+                  description: '',
+                  category: 'Outros',
+                  transactionType: 'Regular',
+                  paymentMethod: ''
+                });
+                setModalVisible(true);
+              }}
+            >
+              <FontAwesome name="plus" size={24} color="#fff" />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.menuButton} 
+              onPress={() => {
+                Alert.alert('Notificações', 'Você não tem novas notificações.');
+              }}
+            >
+              <FontAwesome name="bell" size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </View>
+        
+        {/* Seletor de mês integrado ao cabeçalho */}
+        <View style={styles.monthSelector}>
+          <TouchableOpacity 
+            style={styles.monthButton}
+            onPress={() => changeMonth(-1)}
           >
-            <View style={styles.modalContainer}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Adicionar Balanço</Text>
-                <TouchableOpacity 
-                  style={styles.closeButton}
-                  onPress={() => {
-                    setModalVisible(false);
-                    Keyboard.dismiss();
-                  }}
-                >
-                  <FontAwesome name="times" size={24} color="#333" />
-                </TouchableOpacity>
+            <FontAwesome name="chevron-left" size={20} color="#007bff" />
+          </TouchableOpacity>
+          
+          <Text style={styles.monthText}>
+            {monthYear}
+          </Text>
+          
+          <TouchableOpacity 
+            style={styles.monthButton}
+            onPress={() => changeMonth(1)}
+          >
+            <FontAwesome name="chevron-right" size={20} color="#007bff" />
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  // Função para lidar com o clique nos cards de balanço
+  const handleBalanceCardPress = (type: 'income' | 'expense' | 'balance') => {
+    if (balances.length === 0) {
+      // Se não houver balanços, exibe uma mensagem
+      Alert.alert('Sem registros', 'Não há registros de balanço para o período selecionado.');
+      return;
+    }
+
+    // Prepara os dados para a tela de registro com base no tipo selecionado
+    let screenTitle = '';
+    let preloadedData = {};
+
+    switch (type) {
+      case 'income':
+        screenTitle = 'Registrar Receita';
+        preloadedData = {
+          type: 'income',
+          amount: totalMonthIncome.toString(),
+          date: new Date().toISOString()
+        };
+        break;
+      case 'expense':
+        screenTitle = 'Registrar Despesa';
+        preloadedData = {
+          type: 'expense',
+          amount: totalMonthExpenses.toString(),
+          date: new Date().toISOString()
+        };
+        break;
+      case 'balance':
+        screenTitle = 'Registrar Balanço';
+        preloadedData = {
+          type: 'balance',
+          income: totalMonthIncome.toString(),
+          expense: totalMonthExpenses.toString(),
+          date: new Date().toISOString()
+        };
+        break;
+    }
+
+    // Navega para a tela de registro com os dados pré-carregados
+    try {
+      navigation.navigate('register', { 
+        title: screenTitle,
+        preloadedData
+      });
+    } catch (error) {
+      console.error('Erro ao navegar para a tela de registro:', error);
+      Alert.alert('Erro', 'Não foi possível abrir a tela de registro.');
+    }
+  };
+
+  // Obter todos os métodos de pagamento disponíveis
+  const getAllPaymentMethods = () => {
+    return [
+      'Dinheiro', 'Cartão de Crédito', 'Cartão de Débito', 'Pix', 
+      'Transferência', 'Boleto', 'Cheque', 'Outro'
+    ];
+  };
+
+  // Função para obter o ícone do método de pagamento
+  const getPaymentMethodIcon = (method: string): string => {
+    const methodIcons: Record<string, string> = {
+      'Dinheiro': 'money',
+      'Cartão de Crédito': 'credit-card',
+      'Cartão de Débito': 'credit-card',
+      'Pix': 'qrcode',
+      'Transferência': 'exchange',
+      'Boleto': 'barcode',
+      'Cheque': 'file-text-o',
+      'Outro': 'question-circle'
+    };
+    
+    return methodIcons[method] || 'question-circle';
+  };
+  
+  // Função para obter a cor do método de pagamento
+  const getPaymentMethodColor = (method: string): string => {
+    const methodColors: Record<string, string> = {
+      'Dinheiro': '#2ecc71',
+      'Cartão de Crédito': '#e74c3c',
+      'Cartão de Débito': '#3498db',
+      'Pix': '#9b59b6',
+      'Transferência': '#f39c12',
+      'Boleto': '#1abc9c',
+      'Cheque': '#34495e',
+      'Outro': '#95a5a6'
+    };
+    
+    return methodColors[method] || '#95a5a6';
+  };
+
+  // Efeito para filtrar as transações quando o filtro ou os dados mudam
+  useEffect(() => {
+    if (!activeFilter) {
+      setFilteredBalances(balances);
+      return;
+    }
+    
+    const filtered = balances.filter(transaction => {
+      if (activeFilter === 'Entrada') {
+        return transaction.totalIncome > 0;
+      } else if (activeFilter === 'Saída' || activeFilter === 'Despesa') {
+        return transaction.totalExpenses > 0;
+      }
+      return true;
+    });
+    
+    setFilteredBalances(filtered);
+  }, [activeFilter, balances]);
+
+  // Função para alternar o filtro
+  const toggleFilter = (filter: string) => {
+    if (activeFilter === filter) {
+      setActiveFilter(null);
+    } else {
+      setActiveFilter(filter);
+    }
+  };
+
+  // Função para obter os tipos de transação disponíveis
+  const getTransactionTypes = () => {
+    return ['Regular', 'Recorrente', 'Parcelada'];
+  };
+
+  return (
+    <View style={styles.container}>
+      <StatusBar 
+        barStyle="light-content" 
+        backgroundColor="transparent" 
+        translucent={true} 
+      />
+      <View style={styles.content}>
+        <Header />
+
+        <View style={styles.balanceSection}>
+          <View style={styles.balanceCardsContainer}>
+            <TouchableOpacity 
+              style={styles.balanceCard}
+              onPress={() => handleBalanceCardPress('balance')}
+            >
+              <View style={[
+                styles.balanceCardIcon, 
+                { 
+                  backgroundColor: totalMonthBalance > 0 
+                    ? '#28a745' // Verde para positivo
+                    : totalMonthBalance < 0 
+                      ? '#dc3545' // Vermelho para negativo
+                      : '#ffc107' // Amarelo para zero
+                }
+              ]}>
+                {totalMonthBalance > 0 ? (
+                  <FontAwesome name="arrow-up" size={20} color="#fff" />
+                ) : totalMonthBalance < 0 ? (
+                  <FontAwesome name="arrow-down" size={20} color="#fff" />
+                ) : (
+                  <FontAwesome name="minus" size={20} color="#fff" />
+                )}
               </View>
-              
-              <ScrollView style={styles.modalContent}>
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>Data</Text>
+              <Text style={styles.balanceCardLabel}>Saldo Total</Text>
+              <Text style={[
+                styles.balanceCardValue,
+                {
+                  color: totalMonthBalance > 0 
+                    ? '#28a745' // Verde para positivo
+                    : totalMonthBalance < 0 
+                      ? '#dc3545' // Vermelho para negativo
+                      : '#ffc107' // Amarelo para zero
+                }
+              ]}>
+                R${totalMonthBalance < 0 ? '-' : ''}{Math.abs(totalMonthBalance).toFixed(2).replace('.', ',')}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={styles.balanceCard} 
+              onPress={() => handleBalanceCardPress('balance')}
+            >
+              <View style={[
+                styles.balanceCardIcon, 
+                { 
+                  backgroundColor: totalMonthIncome > totalMonthExpenses 
+                    ? '#28a745' // Verde para positivo
+                    : totalMonthIncome < totalMonthExpenses 
+                      ? '#dc3545' // Vermelho para negativo
+                      : '#ffc107' // Amarelo para zero
+                }
+              ]}>
+                {totalMonthIncome > totalMonthExpenses ? (
+                  <FontAwesome name="arrow-up" size={20} color="#fff" />
+                ) : totalMonthIncome < totalMonthExpenses ? (
+                  <FontAwesome name="arrow-down" size={20} color="#fff" />
+                ) : (
+                  <FontAwesome name="minus" size={20} color="#fff" />
+                )}
+              </View>
+              <Text style={styles.balanceCardLabel}>Balanço do Mês</Text>
+              {balances.length > 0 ? (
+                <Text style={[
+                  styles.balanceCardValue,
+                  {
+                    color: totalMonthIncome > totalMonthExpenses 
+                      ? '#28a745' // Verde para positivo
+                      : totalMonthIncome < totalMonthExpenses 
+                        ? '#dc3545' // Vermelho para negativo
+                        : '#ffc107' // Amarelo para zero
+                  }
+                ]}>
+                  R${totalMonthIncome < totalMonthExpenses ? '-' : ''}{Math.abs(totalMonthIncome - totalMonthExpenses).toFixed(2).replace('.', ',')}
+                </Text>
+              ) : (
+                <Text style={[styles.balanceCardValue, { color: '#999' }]}>
+                  Sem registro
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Filtros de tipo de transação */}
+        <View style={styles.filterContainer}>
+          <Text style={styles.filterLabel}>Filtrar por:</Text>
+          <View style={styles.filterButtonsContainer}>
+            {['Entrada', 'Saída', 'Despesa'].map((filter) => (
+              <TouchableOpacity
+                key={filter}
+                style={[
+                  styles.filterButton,
+                  activeFilter === filter && styles.filterButtonActive
+                ]}
+                onPress={() => toggleFilter(filter)}
+              >
+                <Text style={[
+                  styles.filterButtonText,
+                  activeFilter === filter && styles.filterButtonTextActive
+                ]}>
+                  {filter}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {error && (
+          <ErrorMessage 
+            message={error} 
+            onRetry={() => {
+              setError(null);
+              fetchBalances();
+            }} 
+          />
+        )}
+
+        {loading ? (
+          <SkeletonLoader />
+        ) : (
+          <ScrollView 
+            style={styles.transactionsList}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+          >
+            {/* Transações agrupadas por data */}
+            {filteredBalances.length > 0 ? (
+              groupTransactionsByDate(filteredBalances).map(group => (
+                <Animated.View key={group.date} style={[styles.daySection, animatedStyle]}>
+                  <Text style={styles.daySectionTitle}>
+                    {formatDisplayDate(group.date)}
+                  </Text>
+                  
+                  {group.transactions.map(transaction => (
+                    <TouchableOpacity 
+                      key={transaction.id} 
+                      style={styles.transactionItem}
+                      onPress={() => handleBalancePress(transaction)}
+                    >
+                      <View style={[styles.transactionIconContainer, { backgroundColor: getCategoryInfo(transaction.category || 'Outros').color }]}>
+                        <FontAwesome name={getCategoryInfo(transaction.category || 'Outros').icon} size={20} color="#fff" style={styles.transactionIcon} />
+                      </View>
+                      <View style={styles.transactionDetails}>
+                        <Text style={styles.transactionTitle}>{transaction.description || 'Transação'}</Text>
+                        <Text style={styles.transactionSubtitle}>
+                          {transaction.category || 'Sem categoria'} | {transaction.paymentMethod || 'Método não especificado'}
+                        </Text>
+                        <View style={styles.transactionMetaContainer}>
+                          <Text style={styles.transactionDate}>
+                            {new Date(transaction.date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                          </Text>
+                          {transaction.transactionType && transaction.transactionType !== 'Regular' && (
+                            <Text style={styles.transactionType}>
+                              {transaction.transactionType}
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                      <Text style={[
+                        styles.transactionAmount, 
+                        transaction.totalIncome > 0 ? styles.incomeValue : styles.expenseValue
+                      ]}>
+                        R$ {Math.abs(transaction.totalBalance).toFixed(2).replace('.', ',')}
+                      </Text>
+                      <View style={styles.transactionActions}>
+                        <TouchableOpacity 
+                          style={styles.transactionActionButton}
+                          onPress={() => handleEditBalance(transaction)}
+                        >
+                          <View style={styles.actionButtonCircle}>
+                            <FontAwesome name="pencil" size={14} color="#fff" />
+                          </View>
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={styles.transactionActionButton}
+                          onPress={() => handleDeleteBalance(transaction)}
+                        >
+                          <View style={[styles.actionButtonCircle, styles.actionButtonRed]}>
+                            <FontAwesome name="trash" size={14} color="#fff" />
+                          </View>
+                        </TouchableOpacity>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </Animated.View>
+              ))
+            ) : (
+              <Animated.View style={[styles.noDataContainer, animatedStyle]}>
+                <FontAwesome name="calendar-o" size={50} color="#95a5a6" />
+                <Text style={styles.noDataTitle}>Sem transações</Text>
+                <Text style={styles.noDataText}>
+                  Não há transações registradas para {monthYear}.
+                </Text>
+                <Text style={styles.noDataSubtext}>
+                  Adicione uma nova transação usando o botão abaixo.
+                </Text>
+                <TouchableOpacity 
+                  style={styles.addFirstTransactionButton}
+                  onPress={() => setModalVisible(true)}
+                >
+                  <Text style={styles.addFirstTransactionButtonText}>
+                    Adicionar Transação
+                  </Text>
+                </TouchableOpacity>
+              </Animated.View>
+            )}
+          </ScrollView>
+        )}
+        
+        {/* Modal para adicionar balanço */}
+        <Modal
+          visible={modalVisible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <SafeAreaView style={{ flex: 1 }}>
+            <KeyboardAvoidingView 
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
+              style={{ flex: 1 }}
+            >
+              <View style={styles.modalContainer}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Adicionar Transação</Text>
                   <TouchableOpacity 
-                    style={styles.dateInputContainer}
-                    onPress={() => setShowDatePicker(true)}
+                    style={styles.closeButton}
+                    onPress={() => {
+                      setModalVisible(false);
+                      Keyboard.dismiss();
+                    }}
                   >
-                    <Text style={styles.dateText}>
-                      {formatDate(new Date(newBalance.date))}
-                    </Text>
-                    <FontAwesome name="calendar" size={20} color="#007bff" />
+                    <FontAwesome name="times" size={24} color="#333" />
                   </TouchableOpacity>
-                  {showDatePicker && (
-                    <DateTimePicker
-                      value={selectedDate}
-                      mode="date"
-                      display="default"
-                      onChange={handleDateChange}
+                </View>
+                
+                <ScrollView style={styles.modalContent}>
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Data</Text>
+                    <TouchableOpacity 
+                      style={styles.dateInputContainer}
+                      onPress={() => setShowDatePicker(true)}
+                    >
+                      <Text style={styles.dateText}>
+                        {formatDate(new Date(newBalance.date))}
+                      </Text>
+                      <FontAwesome name="calendar" size={20} color="#007bff" />
+                    </TouchableOpacity>
+                    {showDatePicker && (
+                      <DateTimePicker
+                        value={selectedDate}
+                        mode="date"
+                        display="default"
+                        onChange={handleDateChange}
+                      />
+                    )}
+                  </View>
+                  
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Tipo</Text>
+                    <View style={styles.typeButtonsContainer}>
+                      {['Entrada', 'Saída', 'Despesa'].map((type) => (
+                        <TouchableOpacity
+                          key={type}
+                          style={[
+                            styles.typeButton,
+                            newBalance.type === type && styles.typeButtonActive
+                          ]}
+                          onPress={() => handleValueChange(type, 'type')}
+                        >
+                          <Text 
+                            style={[
+                              styles.typeButtonText,
+                              newBalance.type === type && styles.typeButtonTextActive
+                            ]}
+                          >
+                            {type}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                  
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Tipo de Transação</Text>
+                    <View style={styles.typeButtonsContainer}>
+                      {getTransactionTypes().map((transType) => (
+                        <TouchableOpacity
+                          key={transType}
+                          style={[
+                            styles.typeButton,
+                            newBalance.transactionType === transType && styles.typeButtonActive
+                          ]}
+                          onPress={() => handleValueChange(transType, 'transactionType')}
+                        >
+                          <Text 
+                            style={[
+                              styles.typeButtonText,
+                              newBalance.transactionType === transType && styles.typeButtonTextActive
+                            ]}
+                          >
+                            {transType}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                  
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Valor</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="0,00"
+                      keyboardType="numeric"
+                      value={newBalance.amount}
+                      onChangeText={(text) => handleValueChange(text, 'amount')}
+                      returnKeyType="next"
                     />
-                  )}
-                </View>
+                  </View>
+                  
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Descrição</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Descrição da transação"
+                      value={newBalance.description}
+                      onChangeText={(text) => handleValueChange(text, 'description')}
+                      returnKeyType="next"
+                    />
+                  </View>
+                  
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Categoria</Text>
+                    <View style={styles.categoryContainer}>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        {getAllCategories().map((cat) => (
+                          <TouchableOpacity
+                            key={cat}
+                            style={[
+                              styles.categoryButton,
+                              newBalance.category === cat && styles.categoryButtonActive
+                            ]}
+                            onPress={() => handleValueChange(cat, 'category')}
+                          >
+                            <View style={[styles.categoryIcon, { backgroundColor: getCategoryInfo(cat).color }]}>
+                              <FontAwesome name={getCategoryInfo(cat).icon} size={16} color="#fff" />
+                            </View>
+                            <Text style={[
+                              styles.categoryText,
+                              newBalance.category === cat && styles.categoryTextActive
+                            ]}>
+                              {cat}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.inputContainer}>
+                    <Text style={styles.inputLabel}>Método de Pagamento</Text>
+                    <View style={styles.paymentMethodContainer}>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                        {getAllPaymentMethods().map((method) => (
+                          <TouchableOpacity
+                            key={method}
+                            style={[
+                              styles.paymentMethodButton,
+                              newBalance.paymentMethod === method && styles.paymentMethodButtonActive
+                            ]}
+                            onPress={() => handleValueChange(method, 'paymentMethod')}
+                          >
+                            <View style={[styles.paymentMethodIcon, { backgroundColor: getPaymentMethodColor(method) }]}>
+                              <FontAwesome name={getPaymentMethodIcon(method)} size={16} color="#fff" />
+                            </View>
+                            <Text style={[
+                              styles.paymentMethodText,
+                              newBalance.paymentMethod === method && styles.paymentMethodTextActive
+                            ]}>
+                              {method}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  </View>
+                </ScrollView>
                 
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>Receitas</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="0,00"
-                    keyboardType="numeric"
-                    value={newBalance.totalIncome}
-                    onChangeText={(text) => handleValueChange(text, 'totalIncome')}
-                    returnKeyType="next"
-                    onSubmitEditing={() => expensesInputRef.current?.focus()}
-                  />
+                <View style={styles.modalFooter}>
+                  <TouchableOpacity 
+                    style={[styles.button, styles.cancelButton]}
+                    onPress={() => {
+                      setModalVisible(false);
+                      Keyboard.dismiss();
+                    }}
+                  >
+                    <Text style={styles.buttonText}>Cancelar</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.button, styles.saveButton]}
+                    onPress={handleAddBalance}
+                  >
+                    <Text style={styles.buttonText}>Salvar</Text>
+                  </TouchableOpacity>
                 </View>
-                
-                <View style={styles.inputContainer}>
-                  <Text style={styles.inputLabel}>Despesas</Text>
-                  <TextInput
-                    ref={expensesInputRef}
-                    style={styles.input}
-                    placeholder="0,00"
-                    keyboardType="numeric"
-                    value={newBalance.totalExpenses}
-                    onChangeText={(text) => handleValueChange(text, 'totalExpenses')}
-                    returnKeyType="done"
-                    onSubmitEditing={handleAddBalance}
-                  />
-                </View>
-              </ScrollView>
-              
-              <View style={styles.modalFooter}>
-                <TouchableOpacity 
-                  style={[styles.button, styles.cancelButton]}
-                  onPress={() => {
-                    setModalVisible(false);
-                    Keyboard.dismiss();
-                  }}
-                >
-                  <Text style={styles.buttonText}>Cancelar</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.button, styles.saveButton]}
-                  onPress={handleAddBalance}
-                >
-                  <Text style={styles.buttonText}>Salvar</Text>
-                </TouchableOpacity>
               </View>
-            </View>
-          </KeyboardAvoidingView>
-        </SafeAreaView>
-      </Modal>
-      
-      {/* Botão flutuante para adicionar balanço */}
-      <TouchableOpacity 
-        style={styles.floatingButton}
-        onPress={() => {
-          setSelectedDate(new Date());
-          setNewBalance({
-            date: new Date().toISOString().split('T')[0],
-            totalIncome: '',
-            totalExpenses: ''
-          });
-          setModalVisible(true);
-        }}
-      >
-        <FontAwesome name="plus" size={24} color="#fff" />
-      </TouchableOpacity>
-    </SafeAreaView>
+            </KeyboardAvoidingView>
+          </SafeAreaView>
+        </Modal>
+        
+        {/* Modal para busca */}
+        <Modal
+          visible={searchModalVisible}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setSearchModalVisible(false)}
+        >
+          <SafeAreaView style={{ flex: 1 }}>
+            <KeyboardAvoidingView 
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
+              style={{ flex: 1 }}
+            >
+              <View style={styles.modalContainer}>
+                <View style={styles.modalHeader}>
+                  <Text style={styles.modalTitle}>Buscar Transações</Text>
+                  <TouchableOpacity 
+                    style={styles.closeButton}
+                    onPress={() => {
+                      setSearchModalVisible(false);
+                      Keyboard.dismiss();
+                    }}
+                  >
+                    <FontAwesome name="times" size={24} color="#333" />
+                  </TouchableOpacity>
+                </View>
+                
+                <View style={styles.searchContainer}>
+                  <View style={styles.searchInputContainer}>
+                    <FontAwesome name="search" size={20} color="#999" style={styles.searchIcon} />
+                    <TextInput
+                      style={styles.searchInput}
+                      placeholder="Digite para buscar transações..."
+                      value={searchTerm}
+                      onChangeText={(text) => {
+                        setSearchTerm(text);
+                        setFilteredTransactions(filterTransactions(text));
+                      }}
+                      returnKeyType="search"
+                      autoFocus={true}
+                    />
+                    {searchTerm.length > 0 && (
+                      <TouchableOpacity 
+                        style={styles.clearButton}
+                        onPress={() => {
+                          setSearchTerm('');
+                          setFilteredTransactions([]);
+                        }}
+                      >
+                        <FontAwesome name="times-circle" size={20} color="#999" />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+                
+                <ScrollView style={styles.searchResults}>
+                  {filteredTransactions.length === 0 && searchTerm.length > 0 ? (
+                    <View style={styles.noResultsContainer}>
+                      <FontAwesome name="search" size={50} color="#ddd" />
+                      <Text style={styles.noResultsText}>Nenhuma transação encontrada</Text>
+                    </View>
+                  ) : (
+                    filteredTransactions.map(transaction => (
+                      <TouchableOpacity 
+                        key={transaction.id} 
+                        style={styles.transactionItem}
+                        onPress={() => {
+                          setSearchModalVisible(false);
+                          Alert.alert('Detalhes', `Detalhes da transação: ${transaction.title}`);
+                        }}
+                      >
+                        <View style={[styles.transactionIconContainer, { backgroundColor: transaction.color }]}>
+                          <FontAwesome name={transaction.icon} size={20} color="#fff" style={styles.transactionIcon} />
+                        </View>
+                        <View style={styles.transactionDetails}>
+                          <Text style={styles.transactionTitle}>{transaction.title}</Text>
+                          <Text style={styles.transactionSubtitle}>{transaction.subtitle}</Text>
+                          <Text style={styles.transactionDate}>
+                            {new Date(transaction.date).toLocaleDateString('pt-BR')}
+                          </Text>
+                        </View>
+                        <Text style={[styles.transactionAmount, styles.expenseValue]}>
+                          R$ {transaction.amount.toFixed(2).replace('.', ',')}
+                        </Text>
+                      </TouchableOpacity>
+                    ))
+                  )}
+                </ScrollView>
+              </View>
+            </KeyboardAvoidingView>
+          </SafeAreaView>
+        </Modal>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#007bff', // Voltando para a cor azul
   },
-  header: {
-    backgroundColor: '#007bff',
+  content: {
+    flex: 1,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight + 10 : 10, // Aumentando o padding superior
+  },
+  headerContainer: {
+    backgroundColor: '#007bff', // Voltando para a cor azul
     padding: 8,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: 40,
     paddingBottom: 10,
+    paddingTop: 10,
   },
-  menuButton: {
-    padding: 5,
-  },
-  optionsButton: {
-    padding: 5,
-  },
-  monthSelector: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  arrowButton: {
+  header: {
+    backgroundColor: '#007bff', // Voltando para a cor azul
     padding: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  monthText: {
-    fontSize: 18,
+  headerTitle: {
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#fff',
     textTransform: 'capitalize',
     marginHorizontal: 10,
   },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  menuButton: {
+    padding: 8,
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  monthSelector: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#007bff', // Voltando para a cor azul
+    paddingHorizontal: 15,
+    paddingBottom: 10,
+    paddingTop: 5,
+  },
+  monthButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+  },
+  monthText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    textTransform: 'capitalize',
+    marginHorizontal: 15,
+  },
   balanceSection: {
-    backgroundColor: '#007bff',
+    backgroundColor: '#007bff', // Voltando para a cor azul
+    paddingBottom: 15,
+  },
+  balanceCardsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    paddingHorizontal: 15,
+    marginBottom: 15,
+  },
+  balanceCard: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 10,
+    width: '48%', // Alterando de 48% para 48% para manter dois cards por linha
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    alignItems: 'center',
+  },
+  balanceCardIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#007bff', // Voltando para a cor azul
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  balanceCardLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 2,
+  },
+  balanceCardValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#28a745',
+  },
+  transactionsList: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  daySection: {
+    marginBottom: 10,
+  },
+  daySectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    marginTop: 5,
+  },
+  transactionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  transactionIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#e74c3c',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  transactionIcon: {
+    textAlign: 'center',
+  },
+  transactionDetails: {
+    flex: 1,
+  },
+  transactionTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+  },
+  transactionSubtitle: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 2,
+  },
+  transactionAmount: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginRight: 10,
+  },
+  transactionActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  transactionActionButton: {
+    marginLeft: 5,
+  },
+  actionButtonCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#28a745',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionButtonRed: {
+    backgroundColor: '#dc3545',
   },
   balanceContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#007bff',
+    backgroundColor: '#007bff', // Voltando para a cor azul
     paddingHorizontal: 10,
     paddingVertical: 0,
     paddingTop: 0,
@@ -791,21 +1679,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#fff',
   },
-  chartContainer: {
-    backgroundColor: '#007bff',
-    height: 100,
-  },
   balanceList: {
     flex: 1,
     paddingTop: 5,
-  },
-  balanceCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 10,
-    marginVertical: 6,
-    borderRadius: 10,
-    padding: 12,
-    elevation: 2,
+    backgroundColor: '#f5f5f5',
   },
   balanceCardHeader: {
     flexDirection: 'row',
@@ -833,14 +1710,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 5,
-  },
-  balanceCardLabel: {
-    fontSize: 14,
-    color: '#666',
-  },
-  balanceCardValue: {
-    fontSize: 14,
-    fontWeight: 'bold',
   },
   incomeValue: {
     color: '#28a745',
@@ -927,7 +1796,7 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
   },
   saveButton: {
-    backgroundColor: '#007bff',
+    backgroundColor: '#007bff', // Voltando para a cor azul
   },
   buttonText: {
     fontWeight: 'bold',
@@ -936,7 +1805,52 @@ const styles = StyleSheet.create({
   },
   skeletonContainer: {
     flex: 1,
-    padding: 15,
+    padding: 0,
+    backgroundColor: '#f5f5f5',
+  },
+  skeletonDayTitle: {
+    height: 20,
+    width: '50%',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 4,
+    marginHorizontal: 15,
+    marginVertical: 10,
+  },
+  skeletonIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f0f0f0',
+    marginRight: 12,
+  },
+  skeletonDetails: {
+    flex: 1,
+  },
+  skeletonTitle: {
+    height: 16,
+    width: '70%',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 4,
+    marginBottom: 6,
+  },
+  skeletonSubtitle: {
+    height: 12,
+    width: '50%',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 4,
+  },
+  skeletonAmount: {
+    height: 16,
+    width: 60,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 4,
+    marginRight: 10,
+  },
+  skeletonActions: {
+    width: 60,
+    height: 24,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 4,
   },
   skeletonHeader: {
     height: 20,
@@ -994,7 +1908,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 20,
     right: 20,
-    backgroundColor: '#007bff',
+    backgroundColor: '#007bff', // Voltando para a cor azul
     width: 60,
     height: 60,
     borderRadius: 30,
@@ -1005,40 +1919,234 @@ const styles = StyleSheet.create({
   deleteButton: {
     marginLeft: 15,
   },
-  chartWrapper: {
-    flex: 1,
-    backgroundColor: '#007bff',
-    padding: 0,
-    margin: 0,
-    justifyContent: 'space-between',
-    overflow: 'hidden',
+  searchContainer: {
+    padding: 15,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  chartTitle: {
+  searchInputContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f9f9f9',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    paddingHorizontal: 10,
+    marginRight: 10,
+  },
+  searchIcon: {
+    marginRight: 10,
+    color: '#999',
+  },
+  searchInput: {
+    flex: 1,
+    height: 50,
+    fontSize: 16,
+  },
+  clearButton: {
+    padding: 5,
+  },
+  searchResults: {
+    flex: 1,
+  },
+  noResultsContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 50,
+  },
+  noResultsText: {
+    fontSize: 16,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  transactionDate: {
+    fontSize: 11,
+    color: '#999',
+  },
+  noDataContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 30,
+    marginTop: 50,
+  },
+  noDataTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 20,
+  },
+  noDataText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  noDataSubtext: {
+    fontSize: 14,
+    color: '#95a5a6',
+    textAlign: 'center',
+    marginTop: 5,
+    marginBottom: 20,
+  },
+  addFirstTransactionButton: {
+    backgroundColor: '#007bff',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 5,
+    marginTop: 10,
+  },
+  addFirstTransactionButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
-    textAlign: 'center',
-    marginTop: 5,
-    marginBottom: 0,
   },
-  chartSubtitle: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'normal',
-    textAlign: 'center',
-    marginTop: 0,
-    marginBottom: 5,
-    opacity: 0.8,
+  errorContainer: {
+    padding: 15,
+    backgroundColor: '#ffebee',
+    borderRadius: 5,
+    margin: 15,
   },
-  headerTitle: {
-    fontSize: 18,
+  errorText: {
+    color: '#d32f2f',
+    textAlign: 'center',
+    fontSize: 14,
+  },
+  retryButton: {
+    padding: 15,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  retryButtonText: {
+    color: '#007bff',
     fontWeight: 'bold',
-    color: '#fff',
-    textTransform: 'capitalize',
-    marginHorizontal: 10,
+    fontSize: 16,
   },
-  headerButtons: {
+  typeButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  typeButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 5,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    marginHorizontal: 5,
+    alignItems: 'center',
+  },
+  typeButtonActive: {
+    backgroundColor: '#007bff',
+    borderColor: '#007bff',
+  },
+  typeButtonText: {
+    color: '#333',
+    fontWeight: '500',
+  },
+  typeButtonTextActive: {
+    color: '#fff',
+  },
+  categoryContainer: {
+    marginVertical: 10,
+  },
+  categoryButton: {
+    alignItems: 'center',
+    marginRight: 15,
+    opacity: 0.7,
+  },
+  categoryButtonActive: {
+    opacity: 1,
+  },
+  categoryIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  categoryText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+  },
+  categoryTextActive: {
+    color: '#007bff',
+    fontWeight: 'bold',
+  },
+  paymentMethodContainer: {
+    marginVertical: 10,
+  },
+  paymentMethodButton: {
+    alignItems: 'center',
+    marginRight: 15,
+    opacity: 0.7,
+  },
+  paymentMethodButtonActive: {
+    opacity: 1,
+  },
+  paymentMethodIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  paymentMethodText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+  },
+  paymentMethodTextActive: {
+    color: '#007bff',
+    fontWeight: 'bold',
+  },
+  filterContainer: {
+    paddingHorizontal: 15,
+    marginBottom: 10,
+  },
+  filterLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
+  },
+  filterButtonsContainer: {
+    flexDirection: 'row',
+  },
+  filterButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+    marginRight: 10,
+  },
+  filterButtonActive: {
+    backgroundColor: '#007bff',
+  },
+  filterButtonText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  filterButtonTextActive: {
+    color: '#fff',
+  },
+  transactionMetaContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  transactionType: {
+    fontSize: 10,
+    color: '#fff',
+    backgroundColor: '#007bff',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    overflow: 'hidden',
   },
 }); 
